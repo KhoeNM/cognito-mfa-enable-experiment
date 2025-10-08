@@ -23,6 +23,7 @@ const SetupMFA = () => {
                 setUsername(email || 'user');
 
                 const { secretCode, session } = await setupTOTP(accessToken);
+                console.log('Session when setting up TOTP:', session);
                 setSecretCode(secretCode);
                 setSession(session);
             } catch (error) {
@@ -35,7 +36,10 @@ const SetupMFA = () => {
     }, [accessToken]);
 
     const handleVerify = async () => {
-        if (!accessToken || !session || !verificationCode) {
+        if (!accessToken || !verificationCode) {
+            console.log('AccessToken:', accessToken);
+            // console.log('Session:', session);
+            console.log('VerificationCode:', verificationCode);
             alert('Missing required information for verification. Please try again.');
             return;
         }
@@ -57,6 +61,7 @@ const SetupMFA = () => {
             </h2>
             {secretCode && (
                 <div>
+                    <p>Session when done with set up TOTP: {session}</p>
                     <p>Scan this QR code with your authenticator app:</p>
                     <QRCodeCanvas 
                         value={`otpauth://totp/${username}?secret=${secretCode}`}

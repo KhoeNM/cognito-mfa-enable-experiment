@@ -1,4 +1,4 @@
-import { AssociateSoftwareTokenCommand, CognitoIdentityProviderClient, GlobalSignOutCommand, InitiateAuthCommand, SignUpCommand, VerifySoftwareTokenCommand } from "@aws-sdk/client-cognito-identity-provider";
+import { AssociateSoftwareTokenCommand, CognitoIdentityProviderClient, GetUserCommand, GlobalSignOutCommand, InitiateAuthCommand, RespondToAuthChallengeCommand, SignUpCommand, VerifySoftwareTokenCommand } from "@aws-sdk/client-cognito-identity-provider";
 
 const cognitoClient = new CognitoIdentityProviderClient({region: 'ap-southeast-1'});
 const clientId = '6vrdeipkrr0su8q29k0414r761';
@@ -9,6 +9,9 @@ export interface AuthResponse {
         IdToken?: string;
         RefreshToken?: string;
     };
+    ChallengeName?: string;
+    Session?: string;
+    ChallengeParameters?: { [key: string]: string };
 };
 
 export const signUp = async (email: string, password: string): Promise<void> => {
@@ -35,11 +38,34 @@ export const signIn = async (username: string, password: string): Promise<AuthRe
     return response;
 }
 
+export const checkMfaConfigured = async (accessToken: string): Promise<boolean> => {
+    const command = new GetUserCommand({
+        AccessToken: accessToken
+    });
+    const response = await cognitoClient.send(command);
+    const mfaSettings = response.UserMFASettingList || [];
+    return mfaSettings.includes('SOFTWARE_TOKEN_MFA');
+};
+
+export const respondToMfaChallenge = async (username: string, code: string, session: string): Promise<AuthResponse> => {
+    const command = new RespondToAuthChallengeCommand({
+        ClientId: clientId,
+        ChallengeName: 'SOFTWARE_TOKEN_MFA',
+        Session: session,
+        ChallengeResponses: {
+            USERNAME: username,
+            SOFTWARE_TOKEN_MFA_CODE: code
+        }
+    });
+    return await cognitoClient.send(command);
+};
+
 export const setupTOTP = async (accessToken: string): Promise<{ secretCode: string; session: string }> => {
     const command = new AssociateSoftwareTokenCommand({
         AccessToken: accessToken
     });
     const response = await cognitoClient.send(command);
+    console.log('Response from AssociateSoftwareTokenCommand:', response);
     return {
         secretCode: response.SecretCode || '',
         session: response.Session || ''
@@ -50,7 +76,7 @@ export const verifyTOTP = async (accessToken: string, userCode: string, session:
     const command = new VerifySoftwareTokenCommand({
         AccessToken: accessToken,
         UserCode: userCode,
-        Session: session
+        // Session: session
     });
     await cognitoClient.send(command);
 }
